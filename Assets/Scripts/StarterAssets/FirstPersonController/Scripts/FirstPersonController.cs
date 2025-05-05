@@ -51,8 +51,24 @@ namespace StarterAssets
 		[Tooltip("How far in degrees can you move the camera down")]
 		public float BottomClamp = -90.0f;
 
-		// cinemachine
-		private float _cinemachineTargetPitch;
+
+        // -----------------수정된 부분 시작 ----------------
+        [Header("Crouch Settings")]
+        [Tooltip("Height of the character when crouching")]
+        public float CrouchHeight = 1.0f;
+
+        private float _defaultHeight;
+        private Vector3 _defaultCenter;
+        private Vector3 _crouchCenter;
+
+        private float _defaultCameraY;
+        private float _crouchCameraY;
+
+        private bool _isCrouching;
+        // ----------------수정된 부분 끝 ----------------------------
+
+        // cinemachine
+        private float _cinemachineTargetPitch;
 
 		// player
 		private float _speed;
@@ -108,10 +124,28 @@ namespace StarterAssets
 			// reset our timeouts on start
 			_jumpTimeoutDelta = JumpTimeout;
 			_fallTimeoutDelta = FallTimeout;
+
+
+            // -----------------수정된 부분 시작 ----------------
+            // crouch 초기 설정
+            _defaultHeight = _controller.height;
+            _defaultCenter = _controller.center;
+            _crouchCenter = new Vector3(_defaultCenter.x, CrouchHeight / 2f, _defaultCenter.z);
+
+            // camera 초기 설정
+            _defaultCameraY = CinemachineCameraTarget.transform.localPosition.y;
+            _crouchCameraY = _defaultCameraY * 0.5f;
+            // ----------------수정된 부분 끝 ----------------------------
+        
 		}
 
-		private void Update()
+        private void Update()
 		{
+
+            // -----------------수정된 부분 시작 ----------------
+            HandleCrouch();
+            // ----------------수정된 부분 끝 ----------------------------
+            
 			JumpAndGravity();
 			GroundedCheck();
 			Move();
@@ -122,6 +156,42 @@ namespace StarterAssets
 			CameraRotation();
 		}
 
+        // -----------------수정된 부분 시작 ----------------
+        private void HandleCrouch()
+        {
+            bool crouchPressed = false;
+#if ENABLE_INPUT_SYSTEM
+            if (_playerInput.currentControlScheme == "KeyboardMouse")
+                crouchPressed = Keyboard.current.leftCtrlKey.isPressed;
+#else
+            crouchPressed = Input.GetKey(KeyCode.LeftControl);
+#endif
+            if (crouchPressed && !_isCrouching)
+            {
+                // 캐릭터 컨트롤러 크기 변경
+                _controller.height = CrouchHeight;
+                _controller.center = _crouchCenter;
+
+                // 카메라 높이 절반으로 변경
+                Vector3 camPos = CinemachineCameraTarget.transform.localPosition;
+                CinemachineCameraTarget.transform.localPosition = new Vector3(camPos.x, _crouchCameraY, camPos.z);
+
+                _isCrouching = true;
+            }
+            else if (!crouchPressed && _isCrouching)
+            {
+                // 되돌리기
+                _controller.height = _defaultHeight;
+                _controller.center = _defaultCenter;
+
+                Vector3 camPos = CinemachineCameraTarget.transform.localPosition;
+                CinemachineCameraTarget.transform.localPosition = new Vector3(camPos.x, _defaultCameraY, camPos.z);
+
+                _isCrouching = false;
+            }
+        }
+        // ----------------수정된 부분 끝 ----------------------------
+        
 		private void GroundedCheck()
 		{
 			// set sphere position, with offset
