@@ -57,6 +57,8 @@ namespace StarterAssets
         [Tooltip("Height of the character when crouching")]
         public float CrouchHeight = 1.0f;
 
+        // -----------------수정된 부분 시작 ----------------
+        // 즉시 크라우치 전환, 부드러운 전환 제거
         private float _defaultHeight;
         private Vector3 _defaultCenter;
         private Vector3 _crouchCenter;
@@ -65,7 +67,19 @@ namespace StarterAssets
         private float _crouchCameraY;
 
         private bool _isCrouching;
-        // ----------------수정된 부분 끝 ----------------------------
+        // -----------------수정된 부분 끝 ----------------
+
+
+        // ---------------- 슬라이딩 로직 추가 -------------------
+        [Header("Slide Settings")]
+        [Tooltip("Initial speed of the slide")] public float SlideInitialSpeed = 8.0f;
+        [Tooltip("Rate at which slide speed decays per second")] public float SlideDecayRate = 4.0f;
+
+        private bool _isSliding;
+        private float _currentSlideSpeed;
+        // ---------------- 슬라이딩 로직 추가 끝 -------------------
+
+
 
         // cinemachine
         private float _cinemachineTargetPitch;
@@ -145,8 +159,16 @@ namespace StarterAssets
             // -----------------수정된 부분 시작 ----------------
             HandleCrouch();
             // ----------------수정된 부분 끝 ----------------------------
-            
-			JumpAndGravity();
+
+
+            // ---------------- 슬라이딩 로직 추가 -------------------
+            HandleSlide();
+            // ---------------- 슬라이딩 로직 추가 끝 -------------------
+            // 슬라이드 중에는 기본 이동 로직을 건너뜀
+            if (_isSliding)
+                return;
+
+            JumpAndGravity();
 			GroundedCheck();
 			Move();
 		}
@@ -155,44 +177,63 @@ namespace StarterAssets
 		{
 			CameraRotation();
 		}
+        // ---------------- 슬라이딩 로직 수정 -------------------
+        private void HandleSlide()
+        {
+            // Input System 전용 처리 부분
+            bool crouchHeld = Keyboard.current.leftCtrlKey.isPressed; // <-- 수정된 부분: Input.GetKey -> Input System API
 
-        // -----------------수정된 부분 시작 ----------------
+            if (!_isSliding && _input.sprint && crouchHeld && Grounded)
+            {
+                _isSliding = true;
+                _currentSlideSpeed = SlideInitialSpeed;
+            }
+            if (_isSliding)
+            {
+                // 앉기 해제 시 슬라이드 종료 처리
+                if (!Keyboard.current.leftCtrlKey.isPressed) { _isSliding = false; return; } // <-- 수정된 부분
+                if (_currentSlideSpeed > 0f)
+                {
+                    Vector3 dir = transform.forward;
+
+                    _controller.Move(dir * _currentSlideSpeed * Time.deltaTime);
+                    _currentSlideSpeed = Mathf.Max(_currentSlideSpeed - SlideDecayRate * Time.deltaTime, 0f);
+                }
+            }
+        }
+        // ---------------- 슬라이딩 로직 수정 끝 -------------------
+
+        // ---------------- 크라우치 로직 수정 -------------------
         private void HandleCrouch()
         {
-            bool crouchPressed = false;
 #if ENABLE_INPUT_SYSTEM
-            if (_playerInput.currentControlScheme == "KeyboardMouse")
-                crouchPressed = Keyboard.current.leftCtrlKey.isPressed;
+            bool crouch = Keyboard.current.leftCtrlKey.isPressed;
 #else
-            crouchPressed = Input.GetKey(KeyCode.LeftControl);
+    bool crouch = false;
 #endif
-            if (crouchPressed && !_isCrouching)
+            if (crouch && !_isCrouching)
             {
-                // 캐릭터 컨트롤러 크기 변경
+                // 즉시 앉기
                 _controller.height = CrouchHeight;
                 _controller.center = _crouchCenter;
-
-                // 카메라 높이 절반으로 변경
                 Vector3 camPos = CinemachineCameraTarget.transform.localPosition;
                 CinemachineCameraTarget.transform.localPosition = new Vector3(camPos.x, _crouchCameraY, camPos.z);
-
                 _isCrouching = true;
             }
-            else if (!crouchPressed && _isCrouching)
+            else if (!crouch && _isCrouching)
             {
-                // 되돌리기
+                // 즉시 일어서기
                 _controller.height = _defaultHeight;
                 _controller.center = _defaultCenter;
-
                 Vector3 camPos = CinemachineCameraTarget.transform.localPosition;
                 CinemachineCameraTarget.transform.localPosition = new Vector3(camPos.x, _defaultCameraY, camPos.z);
-
                 _isCrouching = false;
             }
         }
-        // ----------------수정된 부분 끝 ----------------------------
-        
-		private void GroundedCheck()
+        // ---------------- 크라우치 로직 수정 끝 -------------------
+
+
+        private void GroundedCheck()
 		{
 			// set sphere position, with offset
 			Vector3 spherePosition = new Vector3(transform.position.x, transform.position.y - GroundedOffset, transform.position.z);
