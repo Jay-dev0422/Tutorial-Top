@@ -52,32 +52,31 @@ namespace StarterAssets
 		public float BottomClamp = -90.0f;
 
 
-        // -----------------수정된 부분 시작 ----------------
+
         [Header("Crouch Settings")]
         [Tooltip("Height of the character when crouching")]
-        public float CrouchHeight = 1.0f;
+        public float CrouchHeight = 1.0f; // 앉았을 때 캐릭터 컨트롤러 높이
 
-        // -----------------수정된 부분 시작 ----------------
         // 즉시 크라우치 전환, 부드러운 전환 제거
-        private float _defaultHeight;
-        private Vector3 _defaultCenter;
-        private Vector3 _crouchCenter;
 
-        private float _defaultCameraY;
-        private float _crouchCameraY;
+        // 원래 1초? 정도로 해서 앉기 구현하려 했는데 속도감 안나고 답답해서 즉시 앉기로 수정
+        private float _defaultHeight;  // 일어서기 전 기본 높이
+        private Vector3 _defaultCenter; // 일어서기 전 기본 콜라이더 중심
+        private Vector3 _crouchCenter; // 앉았을 때 콜라이더 중심
+		 
+        private float _defaultCameraY; // 일어서기 전 카메라 Y 위치
+        private float _crouchCameraY; // 앉았을 때 카메라 Y 위치
 
-        private bool _isCrouching;
-        // -----------------수정된 부분 끝 ----------------
+        private bool _isCrouching; // 현재 앉아있는지 여부
 
 
-        // ---------------- 슬라이딩 로직 추가 -------------------
-        [Header("Slide Settings")]
-        [Tooltip("Initial speed of the slide")] public float SlideInitialSpeed = 8.0f;
-        [Tooltip("Rate at which slide speed decays per second")] public float SlideDecayRate = 4.0f;
+        // 슬라이딩 기초값 삽입
+        [Header("Slide Settings")] 
+        [Tooltip("Initial speed of the slide")] public float SlideInitialSpeed = 8.0f; // 슬라이드 시작 속도
+        [Tooltip("Rate at which slide speed decays per second")] public float SlideDecayRate = 4.0f; // 초당 얼마나 속도를 줄일지
 
-        private bool _isSliding;
-        private float _currentSlideSpeed;
-        // ---------------- 슬라이딩 로직 추가 끝 -------------------
+        private bool _isSliding; // 현재 슬라이드 중인지
+        private float _currentSlideSpeed; // 프레임마다 갱신되는 슬라이드 속도
 
 
 
@@ -140,30 +139,27 @@ namespace StarterAssets
 			_fallTimeoutDelta = FallTimeout;
 
 
-            // -----------------수정된 부분 시작 ----------------
             // crouch 초기 설정
             _defaultHeight = _controller.height;
             _defaultCenter = _controller.center;
             _crouchCenter = new Vector3(_defaultCenter.x, CrouchHeight / 2f, _defaultCenter.z);
 
-            // camera 초기 설정
+            // 앉기를 누를 경우 카메라 위치를 y값의 절반으로 설정
             _defaultCameraY = CinemachineCameraTarget.transform.localPosition.y;
             _crouchCameraY = _defaultCameraY * 0.5f;
-            // ----------------수정된 부분 끝 ----------------------------
         
 		}
 
         private void Update()
 		{
 
-            // -----------------수정된 부분 시작 ----------------
+			//앉기 컨트롤러
             HandleCrouch();
-            // ----------------수정된 부분 끝 ----------------------------
 
-
-            // ---------------- 슬라이딩 로직 추가 -------------------
+			//슬라이딩 컨트롤러
             HandleSlide();
-            // ---------------- 슬라이딩 로직 추가 끝 -------------------
+
+
             // 슬라이드 중에는 기본 이동 로직을 건너뜀
             if (_isSliding)
                 return;
@@ -177,28 +173,27 @@ namespace StarterAssets
 		{
 			CameraRotation();
 		}
-        // ---------------- 슬라이딩 로직 수정 -------------------
+
         private void HandleSlide()
         {
+
             // Input System 전용 처리 부분
             bool crouchHeld = Keyboard.current.leftCtrlKey.isPressed; // <-- 수정된 부분: Input.GetKey -> Input System API
 
             if (!_isSliding && _input.sprint && crouchHeld && Grounded)
             {
+
+                // Shift+Ctrl 누르고 땅에 서 있을 때만 슬라이드 시작
                 _isSliding = true;
                 _currentSlideSpeed = SlideInitialSpeed;
             }
             if (_isSliding)
             {
                 // 앉기 해제 시 슬라이드 종료 처리
-                if (!Keyboard.current.leftCtrlKey.isPressed) { _isSliding = false; return; } // <-- 수정된 부분
+                if (!Keyboard.current.leftCtrlKey.isPressed) { _isSliding = false; return; } // 슬라이드 중엔 기본 Move() 건너뜀
                 if (_currentSlideSpeed > 0f)
                 {
                     Vector3 dir = transform.forward;
-                    // ---------------- 슬라이딩 경사로 가속 로직 수정 전 ----------------
-                    // _controller.Move(dir * _currentSlideSpeed * Time.deltaTime);
-                    // _currentSlideSpeed = Mathf.Max(_currentSlideSpeed - SlideDecayRate * Time.deltaTime, 0f);
-                    // ---------------- 슬라이딩 경사로 가속 로직 수정 후 ----------------
                     // 1) 내리막일 때만 가속 추가
                     if (Physics.Raycast(transform.position, Vector3.down, out RaycastHit hit, 1.5f, GroundLayers))
                     {
@@ -206,6 +201,11 @@ namespace StarterAssets
                         if (slopeAngle > 0f)
                         {
                             // 중력 성분을 이용한 가속량: g * sin(theta)
+
+                            // float slopeAccel = (중력 크기, 15) * Sin(경사각 in Radian);
+							//경사각이 0° (완전 평지) 이면 Sin(0) = 0 → slopeAccel = 0 → 가속 없음
+							//경사각이 90° (완전 수직) 이면 Sin(90°)= 1 → slopeAccel = 15 → 중력 전체가 가속으로 작용
+							//경사각이 30° 이면 Sin(30°)= 0.5 → slopeAccel = 15 * 0.5 = 7.5 → 내리막 가속 7.5m / s²
                             float slopeAccel = Mathf.Abs(Gravity) * Mathf.Sin(slopeAngle * Mathf.Deg2Rad);
                             _currentSlideSpeed += slopeAccel * Time.deltaTime;
                         }
@@ -217,13 +217,9 @@ namespace StarterAssets
                     _controller.Move((slideMove + Vector3.up * _verticalVelocity) * Time.deltaTime);
                     // 4) 평지 혹은 여전히 슬라이드 중인 상태에서 속도 감쇠
                     _currentSlideSpeed = Mathf.Max(_currentSlideSpeed - SlideDecayRate * Time.deltaTime, 0f);
-                    // ---------------- 슬라이딩 경사로 가속 로직 수정 끝 -----------------
                 }
             }
         }
-        // ---------------- 슬라이딩 로직 수정 끝 -------------------
-
-        // ---------------- 크라우치 로직 수정 -------------------
         private void HandleCrouch()
         {
 #if ENABLE_INPUT_SYSTEM
@@ -231,7 +227,7 @@ namespace StarterAssets
 #else
     bool crouch = false;
 #endif
-            if (crouch && !_isCrouching)
+            if (crouch && !_isCrouching) // Ctrl 눌렀을 경우
             {
                 // 즉시 앉기
                 _controller.height = CrouchHeight;
@@ -240,7 +236,7 @@ namespace StarterAssets
                 CinemachineCameraTarget.transform.localPosition = new Vector3(camPos.x, _crouchCameraY, camPos.z);
                 _isCrouching = true;
             }
-            else if (!crouch && _isCrouching)
+            else if (!crouch && _isCrouching) // Ctrl 안 눌렀을 경우
             {
                 // 즉시 일어서기
                 _controller.height = _defaultHeight;
@@ -250,7 +246,6 @@ namespace StarterAssets
                 _isCrouching = false;
             }
         }
-        // ---------------- 크라우치 로직 수정 끝 -------------------
 
 
         private void GroundedCheck()
