@@ -196,7 +196,19 @@ namespace StarterAssets
                 {
                     Vector3 dir = transform.forward;
 
-                    _controller.Move(dir * _currentSlideSpeed * Time.deltaTime);
+                    // ---------------- 슬라이딩 로직 수정 전 ----------------
+                    // _controller.Move(dir * _currentSlideSpeed * Time.deltaTime);
+                    // ---------------- 슬라이딩 로직 수정 후 ----------------
+                    // 1) 계속 중력 적용
+                    _verticalVelocity += Gravity * Time.deltaTime;
+                    // 2) 앞 방향 슬라이드 벡터
+                    Vector3 slideMove = dir * _currentSlideSpeed;
+                    // 3) 중력까지 합쳐서 한 번에 Move
+                    _controller.Move((slideMove + Vector3.up * _verticalVelocity) * Time.deltaTime);
+                    // 4) 속도 감쇠
+                    _currentSlideSpeed = Mathf.Max(_currentSlideSpeed - SlideDecayRate * Time.deltaTime, 0f);
+                    // ---------------- 슬라이딩 로직 수정 끝 -----------------
+
                     _currentSlideSpeed = Mathf.Max(_currentSlideSpeed - SlideDecayRate * Time.deltaTime, 0f);
                 }
             }
