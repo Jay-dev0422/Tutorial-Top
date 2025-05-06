@@ -195,21 +195,29 @@ namespace StarterAssets
                 if (_currentSlideSpeed > 0f)
                 {
                     Vector3 dir = transform.forward;
-
-                    // ---------------- 슬라이딩 로직 수정 전 ----------------
+                    // ---------------- 슬라이딩 경사로 가속 로직 수정 전 ----------------
                     // _controller.Move(dir * _currentSlideSpeed * Time.deltaTime);
-                    // ---------------- 슬라이딩 로직 수정 후 ----------------
-                    // 1) 계속 중력 적용
+                    // _currentSlideSpeed = Mathf.Max(_currentSlideSpeed - SlideDecayRate * Time.deltaTime, 0f);
+                    // ---------------- 슬라이딩 경사로 가속 로직 수정 후 ----------------
+                    // 1) 내리막일 때만 가속 추가
+                    if (Physics.Raycast(transform.position, Vector3.down, out RaycastHit hit, 1.5f, GroundLayers))
+                    {
+                        float slopeAngle = Vector3.Angle(hit.normal, Vector3.up);
+                        if (slopeAngle > 0f)
+                        {
+                            // 중력 성분을 이용한 가속량: g * sin(theta)
+                            float slopeAccel = Mathf.Abs(Gravity) * Mathf.Sin(slopeAngle * Mathf.Deg2Rad);
+                            _currentSlideSpeed += slopeAccel * Time.deltaTime;
+                        }
+                    }
+                    // 2) 중력 계속 적용
                     _verticalVelocity += Gravity * Time.deltaTime;
-                    // 2) 앞 방향 슬라이드 벡터
+                    // 3) 합쳐서 이동
                     Vector3 slideMove = dir * _currentSlideSpeed;
-                    // 3) 중력까지 합쳐서 한 번에 Move
                     _controller.Move((slideMove + Vector3.up * _verticalVelocity) * Time.deltaTime);
-                    // 4) 속도 감쇠
+                    // 4) 평지 혹은 여전히 슬라이드 중인 상태에서 속도 감쇠
                     _currentSlideSpeed = Mathf.Max(_currentSlideSpeed - SlideDecayRate * Time.deltaTime, 0f);
-                    // ---------------- 슬라이딩 로직 수정 끝 -----------------
-
-                    _currentSlideSpeed = Mathf.Max(_currentSlideSpeed - SlideDecayRate * Time.deltaTime, 0f);
+                    // ---------------- 슬라이딩 경사로 가속 로직 수정 끝 -----------------
                 }
             }
         }
