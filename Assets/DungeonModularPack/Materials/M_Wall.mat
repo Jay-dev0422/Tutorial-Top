@@ -159,7 +159,7 @@ Material:
     - _OcclusionStrength: 1
     - _Parallax: 0.005
     - _Param_AO: 1
-    - _Param_Metalic: 1
+    - _Param_Metalic: 0
     - _Param_Roughness: 1
     - _QueueControl: 0
     - _QueueOffset: 0
